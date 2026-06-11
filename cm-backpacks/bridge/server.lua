@@ -294,15 +294,11 @@ end
 -- Register Useable Item
 function CMBridge.RegisterUseable(itemName, callback)
     if CMBridge.Inventory == 'ox_inventory' then
-        exports.ox_inventory:registerHook('usingItem', function(payload)
-            if payload.item.name == itemName then
-                callback(payload.source, payload.item)
-                return
-            end
-        end, {})
-        
+        -- ox_inventory uses client.export in items.lua, not server-side registration.
+        -- The net event cm-backpacks:server:useBackpack is handled in server/main.lua
+        -- where UseBackpack() is defined, so nothing to register here.
+
     elseif CMBridge.Inventory == 'qs-inventory' or CMBridge.Inventory == 'qb-inventory' or CMBridge.Inventory == 'ps-inventory' then
-        -- For all QB-based inventories (including qs-inventory), use QBCore registration
         if CMBridge.Framework == 'qb-core' then
             local QBCore = exports['qb-core']:GetCoreObject()
             QBCore.Functions.CreateUseableItem(itemName, callback)

@@ -10,6 +10,20 @@ RegisterNetEvent('qb-inventory:client:openInventory', function(items, other)
     end
 end)
 
+-- OX Inventory stash opening handler
+-- Server registers the stash then fires this event; client calls openInventory on its end
+RegisterNetEvent('cm-backpacks:client:openOXStash', function(stashId)
+    if Config.Debug then
+        print('^3[cm-backpacks CLIENT] Opening OX stash: ' .. stashId .. '^0')
+    end
+
+    exports.ox_inventory:openInventory('stash', stashId)
+
+    if Config.Debug then
+        print('^2[cm-backpacks CLIENT] OX stash open called^0')
+    end
+end)
+
 -- QS-Inventory stash opening handler
 RegisterNetEvent('cm-backpacks:client:openQSStash', function(stashId, maxWeight, slots)
     if Config.Debug then

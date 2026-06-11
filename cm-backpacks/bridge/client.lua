@@ -354,3 +354,19 @@ CreateThread(function()
     Wait(500)
     CMBridge.InitFramework()
 end)
+
+-- Keybind to open backpack
+-- RegisterKeyMapping makes it show up in FiveM settings → Keybinds → cm-backpacks
+-- and allows each player to remap it independently.
+if Config.Keybind and Config.Keybind.Enabled then
+    RegisterCommand(Config.Keybind.Command, function()
+        TriggerServerEvent('cm-backpacks:server:keybindOpen')
+    end, false)
+
+    RegisterKeyMapping(
+        Config.Keybind.Command,
+        Config.Keybind.Description,
+        'keyboard',
+        Config.Keybind.DefaultKey
+    )
+end

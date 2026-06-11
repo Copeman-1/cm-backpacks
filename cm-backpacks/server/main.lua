@@ -44,7 +44,6 @@ end
 -- Check for nested backpacks
 local function CheckForNestedBackpacks(stashItems, backpackId, source)
     local hasNested = false
-    local Player = CMBridge.GetPlayer(source)
     
     for slot, item in pairs(stashItems) do
         if item and CMBackpacks.IsBackpack(item.name) then
@@ -91,7 +90,7 @@ local function OpenBackpack(source, backpackId, itemName)
     
     local stashId = backpackId
     local slots = backpackConfig.slots or 20
-    local maxWeight = backpackConfig.weight or backpackConfig.size or 200000
+    local maxWeight = backpackConfig.maxWeight or backpackConfig.size or 200000
     
     CMBackpacks.DebugPrint('Stash ID: ' .. stashId)
     CMBackpacks.DebugPrint('Slots: ' .. slots .. ', Weight/Size: ' .. maxWeight .. ', Inventory: ' .. CMBridge.Inventory)
@@ -149,9 +148,22 @@ local function UseBackpack(source, item)
     end
     
     -- Get or create metadata
-    local metadata = item.info or item.metadata or {}
+    -- Note: ox_inventory sends metadata as empty table {} which json-encodes as []
+    -- Normalise to ensure we always have a real table
+    local metadata = item.metadata or item.info or {}
+    if type(metadata) ~= 'table' then metadata = {} end
     CMBackpacks.DebugPrint('[cm-backpacks DEBUG] Metadata: ' .. json.encode(metadata))
-    
+
+    -- For ox_inventory, always re-fetch metadata directly from the slot to get the
+    -- authoritative value - the item table we received may be stale/empty
+    if CMBridge.Inventory == 'ox_inventory' and item.slot then
+        local freshSlot = exports.ox_inventory:GetSlot(source, item.slot)
+        if freshSlot and freshSlot.metadata then
+            metadata = freshSlot.metadata
+            CMBackpacks.DebugPrint('[cm-backpacks DEBUG] Fresh metadata from GetSlot: ' .. json.encode(metadata))
+        end
+    end
+
     -- Check if backpack has an ID
     local backpackId = metadata.ID or metadata.id
     
@@ -160,21 +172,29 @@ local function UseBackpack(source, item)
         backpackId = CMBackpacks.GenerateId(identifier, CMBridge.GetCharacterName(Player))
         CMBackpacks.DebugPrint('[cm-backpacks SUCCESS] Generated new ID: ' .. backpackId, 'success')
         
-        -- Update metadata with QS-Inventory format
-        metadata.ID = backpackId  -- Capital ID for QS-Inventory
-        metadata.weight = backpackConfig.weight or 200000
+        -- Update metadata
+        metadata.ID = backpackId
+        metadata.weight = backpackConfig.itemWeight or 500
         metadata.slots = backpackConfig.slots or 20
         metadata.quality = 100
         
         -- Update item metadata
         if CMBridge.Inventory == 'ox_inventory' then
             exports.ox_inventory:SetMetadata(source, item.slot, metadata)
+            -- Verify it saved
+            Wait(50)
+            local verify = exports.ox_inventory:GetSlot(source, item.slot)
+            if verify and verify.metadata and (verify.metadata.ID or verify.metadata.id) then
+                CMBackpacks.DebugPrint('[cm-backpacks SUCCESS] Metadata verified in slot: ' .. json.encode(verify.metadata), 'success')
+            else
+                CMBackpacks.DebugPrint('[cm-backpacks ERROR] SetMetadata did not persist! Slot metadata: ' .. json.encode(verify and verify.metadata or 'nil'), 'error')
+            end
         else
             item.info = metadata
             Player.Functions.SetInventory(Player.PlayerData.items)
         end
         
-        CMBackpacks.DebugPrint('[cm-backpacks SUCCESS] Metadata saved with QS format', 'success')
+        CMBackpacks.DebugPrint('[cm-backpacks SUCCESS] Metadata saved', 'success')
     else
         CMBackpacks.DebugPrint('[cm-backpacks DEBUG] Using existing ID: ' .. backpackId)
     end
@@ -233,13 +253,30 @@ RegisterNetEvent('cm-backpacks:server:dropBackpack', function(backpackId)
     CloseBackpack(source, backpackId)
 end)
 
--- Register useable items
+-- ox_inventory net event handler
+-- Lives here so it has direct access to the local UseBackpack function.
+-- For qb/qs/ps inventories this event is never triggered; they use CreateUseableItem directly.
+RegisterNetEvent('cm-backpacks:server:useBackpack')
+AddEventHandler('cm-backpacks:server:useBackpack', function(itemName, slot, metadata)
+    local source = source
+    print('^3[cm-backpacks SERVER] useBackpack received - source: ' .. tostring(source) .. ', item: ' .. tostring(itemName) .. '^0')
+
+    local item = {
+        name     = itemName,
+        slot     = slot,
+        metadata = metadata or {},
+        info     = metadata or {},
+    }
+
+    UseBackpack(source, item)
+end)
+
+-- Register useable items (qb/qs/ps only - ox uses client.export in items.lua)
 CreateThread(function()
     Wait(2000)
     
     local backpacks = CMBackpacks.GetAllBackpacks()
     
-    -- Check if we're using QS-Inventory and if CreateUsableItem is available
     local useQSMethod = CMBridge.Inventory == 'qs-inventory' and _G.CreateUsableItem ~= nil
     
     if Config.Debug then
@@ -252,12 +289,10 @@ CreateThread(function()
     
     for itemName, config in pairs(backpacks) do
         if useQSMethod then
-            -- Use QS-Inventory's CreateUsableItem function
             CreateUsableItem(itemName, function(source, item)
                 UseBackpack(source, item)
             end)
         else
-            -- Use bridge registration (QBCore or ox_inventory)
             CMBridge.RegisterUseable(itemName, function(source, item)
                 UseBackpack(source, item)
             end)
@@ -269,6 +304,30 @@ CreateThread(function()
     end
 end)
 
+-- Event: Player used keybind to open backpack
+RegisterNetEvent('cm-backpacks:server:keybindOpen')
+AddEventHandler('cm-backpacks:server:keybindOpen', function()
+    local source = source
+    local items = CMBridge.GetPlayerItems(source)
+    if not items then return end
+
+    -- Find the first backpack in the player's inventory
+    local foundItem = nil
+    for _, item in pairs(items) do
+        if item and CMBackpacks.IsBackpack(item.name) then
+            foundItem = item
+            break
+        end
+    end
+
+    if not foundItem then
+        CMBridge.Notify(source, 'You don\'t have a backpack.', 'error')
+        return
+    end
+
+    UseBackpack(source, foundItem)
+end)
+
 -- Clean up stale entries periodically
 CreateThread(function()
     while true do
@@ -276,7 +335,6 @@ CreateThread(function()
         
         local currentTime = os.time()
         for backpackId, data in pairs(openBackpacks) do
-            -- Close backpacks that have been open for more than 30 minutes
             if currentTime - data.timestamp > 1800 then
                 CMBackpacks.DebugPrint('Cleaning up stale backpack: ' .. backpackId)
                 openBackpacks[backpackId] = nil

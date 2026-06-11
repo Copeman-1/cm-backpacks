@@ -6,31 +6,24 @@ OXInventoryBridge = {}
 -- Open Stash for OX Inventory
 function OXInventoryBridge.OpenStash(source, stashId, slots, maxWeight)
     CMBackpacks.DebugPrint('Using ox_inventory RegisterStash')
-    
-    -- Register the stash with ox_inventory
+
+    -- Register the stash with ox_inventory (safe to call multiple times)
     local success = pcall(function()
         exports.ox_inventory:RegisterStash(stashId, 'Backpack', slots, maxWeight, nil)
     end)
-    
+
     if not success then
         CMBackpacks.DebugPrint('Failed to register ox_inventory stash', 'error')
         return false
     end
-    
-    CMBackpacks.DebugPrint('OX stash registered, opening...', 'success')
-    
-    -- Open the stash for the player
-    local opened = pcall(function()
-        exports.ox_inventory:forceOpenInventory(source, 'stash', stashId)
-    end)
-    
-    if opened then
-        CMBackpacks.DebugPrint('OX Inventory stash opened successfully', 'success')
-        return true
-    else
-        CMBackpacks.DebugPrint('Failed to open OX Inventory stash', 'error')
-        return false
-    end
+
+    CMBackpacks.DebugPrint('OX stash registered, telling client to open...', 'success')
+
+    -- forceOpenInventory does not exist in ox_inventory/piotreq fork.
+    -- Instead tell the client to open it via the standard ox_inventory client event.
+    TriggerClientEvent('cm-backpacks:client:openOXStash', source, stashId)
+
+    return true
 end
 
 -- Get Stash Items for OX Inventory

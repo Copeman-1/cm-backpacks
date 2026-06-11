@@ -12,6 +12,18 @@ Config = {}
 Config.Debug = false  -- Set to true for troubleshooting
 
 -- ============================================
+-- KEYBIND
+-- ============================================
+-- Allows players to open their backpack via a keybind.
+-- The default key can be changed per-player in FiveM settings → Keybinds → cm-backpacks.
+Config.Keybind = {
+    Enabled     = true,
+    Command     = 'openbackpack',   -- /openbackpack command (also used as the keybind id)
+    DefaultKey  = '6',              -- default key (any FiveM key name)
+    Description = 'Open backpack',  -- label shown in the FiveM keybinds menu
+}
+
+-- ============================================
 -- FRAMEWORK & INVENTORY
 -- ============================================
 -- Framework Detection (auto-detects, or set manually: 'qb-core', 'qbox', or nil)
@@ -47,8 +59,9 @@ Config.Backpacks = {
         item = 'backpack1',
         label = 'Small Backpack',
         slots = 20,
-        weight = 200000, -- ox_inventory uses weight
-        size = 200000,   -- qb-inventory/qs-inventory uses size
+        itemWeight = 5,    -- how much the backpack itself weighs in the player's inventory
+        maxWeight = 200000,  -- max weight the backpack can hold (ox_inventory)
+        size = 200000,       -- qb-inventory/qs-inventory uses size
     },
     
     -- Medium Backpack
@@ -56,9 +69,10 @@ Config.Backpacks = {
         item = 'backpack2',
         label = 'Medium Backpack',
         slots = 30,
-        weight = 300000,
+        itemWeight = 750,
+        maxWeight = 300000,
         size = 300000,
-        blacklist = { -- Items NOT allowed in this backpack
+        blacklist = {
             'weapon_pistol',
             'water'
         }
@@ -69,7 +83,8 @@ Config.Backpacks = {
         item = 'backpack3',
         label = 'Large Backpack',
         slots = 40,
-        weight = 400000,
+        itemWeight = 1000,
+        maxWeight = 400000,
         size = 400000,
     },
     
@@ -78,9 +93,10 @@ Config.Backpacks = {
         item = 'duffle1',
         label = 'Duffel Bag',
         slots = 25,
-        weight = 250000,
+        itemWeight = 750,
+        maxWeight = 250000,
         size = 250000,
-        whitelist = { -- ONLY these items allowed
+        whitelist = {
             'iron',
             'steel',
             'copper'
@@ -92,7 +108,8 @@ Config.Backpacks = {
         item = 'paramedicbag',
         label = 'Paramedic Bag',
         slots = 15,
-        weight = 150000,
+        itemWeight = 500,
+        maxWeight = 150000,
         size = 150000,
         jobLock = {
             jobs = {'ambulance', 'doctor'},
@@ -105,7 +122,8 @@ Config.Backpacks = {
         item = 'policebag',
         label = 'Evidence Bag',
         slots = 20,
-        weight = 200000,
+        itemWeight = 500,
+        maxWeight = 200000,
         size = 200000,
         jobLock = {
             jobs = {'police'},

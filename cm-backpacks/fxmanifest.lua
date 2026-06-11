@@ -3,7 +3,7 @@ game 'gta5'
 
 name 'cm-backpacks'
 description 'backpack system with modular inventory support for QBCore/QBox/ESX'
-version '1.0.0'
+version '2.1.0'
 author 'Copeman'
 repository ''
 
